@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <!-- Adaptation sur mobile -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jeu de Numéros Français</title>
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet">
+  <style>
+    /* Réglages généraux */
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+      font-family: 'Montserrat', sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      background: #ffffffcc;
+      border-radius: 10px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+      padding: 30px;
+      max-width: 600px;
+      width: 90%;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #333;
+    }
+    #menu, #game, #result {
+      text-align: center;
+      margin-top: 20px;
+    }
+    #challenge {
+      font-size: 1.5em;
+      margin: 20px 0;
+      color: #444;
+    }
+    input[type="text"],
+    input[type="number"] {
+      font-size: 1.2em;
+      padding: 10px;
+      margin: 5px;
+      border: 2px solid #ddd;
+      border-radius: 5px;
+      width: calc(100% - 24px);
+    }
+    button {
+      font-size: 1em;
+      padding: 10px 20px;
+      margin: 10px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      background-color: #ff6f91;
+      color: white;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #ff3f6f;
+    }
+    #timer, #roundInfo, #score {
+      font-weight: bold;
+      color: #555;
+    }
+    #feedback {
+      margin-top: 15px;
+      font-size: 1.2em;
+      color: #333;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+    th, td {
+      padding: 10px;
+      text-align: center;
+    }
+    th {
+      background-color: #ff6f91;
+      color: white;
+    }
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Jeu de Numéros Français</h1>
+  
+  <!-- Menu : réglage de la gamme et démarrage du mode unique -->
+  <div id="menu">
+    <div id="rangeSettings">
+      <p>Définissez la gamme des numéros :</p>
+      <label for="minValue">Minimum :</label>
+      <input type="number" id="minValue" value="1" min="1">
+      <label for="maxValue">Maximum :</label>
+      <input type="number" id="maxValue" value="2025" min="1">
+    </div>
+    <p>Lancer le mode : <strong>Écouter et taper</strong></p>
+    <button id="startButton">Commencer</button>
+  </div>
+  
+  <!-- Zone du jeu -->
+  <div id="game" style="display:none;">
+    <div id="roundInfo">Tour : <span id="currentRound">0</span> / 10</div>
+    <div id="timer">Temps restant : <span id="timeLeft">15</span> s</div>
+    <div id="score">Score : <span id="totalScore">0</span></div>
+    <div id="challenge"></div>
+    <div id="inputArea"></div>
+    <div id="feedback"></div>
+    <button id="nextRoundButton" style="display:none;">Suivant</button>
+  </div>
+  
+  <!-- Zone des résultats -->
+  <div id="result" style="display:none;"></div>
+</div>
+
+<script>
+  // Fonction pour demander le mode plein écran (nécessite une interaction utilisateur)
+  function requestFullScreen() {
+    const el = document.documentElement;
+    if (el.requestFullscreen) {
+      el.requestFullscreen();
+    } else if (el.webkitRequestFullscreen) { // Safari
+      el.webkitRequestFullscreen();
+    } else if (el.msRequestFullscreen) { // IE11
+      el.msRequestFullscreen();
+    }
+  }
+  
+  // Variables globales
+  let round = 0;
+  let totalScore = 0;
+  let currentNumber = 0;
+  let startTime = 0;
+  let timerInterval = null;
+  const maxRounds = 10;         // 10 tours
+  const timeLimit = 15;         // 15 secondes par tour
+  let minNumber = 1, maxNumber = 2025;  // Gamme par défaut
+  let answerSubmitted = false;  // Pour éviter plusieurs validations par tour
+  let roundResults = [];        // Tableau pour stocker le résultat de chaque tour
+  
+  // Éléments de l'interface
+  const menuDiv = document.getElementById("menu");
+  const gameDiv = document.getElementById("game");
+  const resultDiv = document.getElementById("result");
+  const currentRoundSpan = document.getElementById("currentRound");
+  const timeLeftSpan = document.getElementById("timeLeft");
+  const totalScoreSpan = document.getElementById("totalScore");
+  const challengeDiv = document.getElementById("challenge");
+  const inputAreaDiv = document.getElementById("inputArea");
+  const feedbackDiv = document.getElementById("feedback");
+  const nextRoundButton = document.getElementById("nextRoundButton");
+  
+  // Mise à jour de la gamme en lisant les valeurs saisies
+  function updateRange() {
+    const minInput = document.getElementById("minValue");
+    const maxInput = document.getElementById("maxValue");
+    minNumber = parseInt(minInput.value, 10);
+    maxNumber = parseInt(maxInput.value, 10);
+    if (isNaN(minNumber) || isNaN(maxNumber) || minNumber < 1 || maxNumber < minNumber) {
+      alert("Veuillez saisir une gamme valide (min >= 1 et max >= min).");
+      throw new Error("Gamme non valide");
+    }
+  }
+  
+  // Démarrage de la partie
+  document.getElementById("startButton").addEventListener("click", function() {
+    updateRange();
+    // Demander le mode plein écran (seulement sur mobile ou petits écrans)
+    if (window.innerWidth < 600) {
+      requestFullScreen();
+    }
+    startGame();
+  });
+  
+  function startGame() {
+    round = 0;
+    totalScore = 0;
+    roundResults = [];
+    totalScoreSpan.textContent = totalScore;
+    menuDiv.style.display = "none";
+    gameDiv.style.display = "block";
+    resultDiv.style.display = "none";
+    nextRoundButton.style.display = "none";
+    feedbackDiv.textContent = "";
+    nextRound();
+  }
+  
+  // Lancement du tour suivant
+  function nextRound() {
+    round++;
+    answerSubmitted = false;  // Réinitialiser pour ce tour
+    if (round > maxRounds) {
+      gameOver();
+      return;
+    }
+    currentRoundSpan.textContent = round;
+    challengeDiv.textContent = "";
+    inputAreaDiv.innerHTML = "";
+    feedbackDiv.textContent = "";
+    nextRoundButton.style.display = "none";
+    timeLeftSpan.textContent = timeLimit;
+    // Générer un nombre aléatoire dans la gamme choisie
+    currentNumber = Math.floor(Math.random() * (maxNumber - minNumber + 1)) + minNumber;
+    startTime = new Date().getTime();
+    
+    // Démarrer le timer (mise à jour toutes les 100 ms)
+    clearInterval(timerInterval);
+    timerInterval = setInterval(updateTimer, 100);
+    
+    mode1Round(currentNumber);
+  }
+  
+  // Mise à jour du timer et vérification de la limite de temps
+  function updateTimer() {
+    let elapsed = (new Date().getTime() - startTime) / 1000;
+    let remaining = (timeLimit - elapsed).toFixed(1);
+    timeLeftSpan.textContent = remaining;
+    if (elapsed >= timeLimit) {
+      clearInterval(timerInterval);
+      feedbackDiv.textContent = "Temps écoulé ! La bonne réponse était : " + currentNumber;
+      // Enregistrer le résultat en cas d'échec (temps écoulé)
+      roundResults.push({
+        round: round,
+        number: currentNumber,
+        correct: false,
+        elapsed: timeLimit,
+        points: 0,
+        answer: ""
+      });
+      disableInput();
+      nextRoundButton.style.display = "inline-block";
+    }
+  }
+  
+  // Désactiver les champs de saisie
+  function disableInput() {
+    let inputs = inputAreaDiv.getElementsByTagName("input");
+    for (let input of inputs) {
+      input.disabled = true;
+    }
+  }
+  
+  // Mode unique : L'utilisateur écoute le nombre et doit le taper (en chiffres)
+  function mode1Round(num) {
+    // Fonction pour lancer la synthèse vocale
+    function speakAudio() {
+      let text = numberToFrench(num);
+      const API_URL = "http://py313-env.eba-tccdj3if.us-east-1.elasticbeanstalk.com"
+      let audio = new Audio(`${API_URL}/tts?text=${encodeURIComponent(text)}`);
+      audio.play().catch(() => {
+        // Sinon, utiliser la synthèse vocale native du navigateur
+        let utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "fr-FR";
+        if (speechSynthesis.getVoices().length === 0) {
+          speechSynthesis.onvoiceschanged = function() {
+              speechSynthesis.speak(utterance);
+              speechSynthesis.onvoiceschanged = null;
+          };
+        } else {
+          speechSynthesis.speak(utterance);
+        }
+      });
+    }
+    
+    // Lecture initiale de l'audio
+    speakAudio();
+    
+    challengeDiv.textContent = "Écoutez le nombre et tapez-le (en chiffres) :";
+    inputAreaDiv.innerHTML = `
+      <input type="number" id="userAnswer" autofocus autocomplete="off">
+      <button id="replayAudio">Réécouter</button>
+      <button id="submitAnswer">Valider</button>
+    `;
+    
+    // Bouton pour réécouter l'audio
+    document.getElementById("replayAudio").addEventListener("click", function() {
+      speakAudio();
+    });
+    
+    // Bouton pour valider manuellement la réponse
+    document.getElementById("submitAnswer").addEventListener("click", function() {
+      processMode1Answer();
+    });
+    
+    // Validation automatique dès que la bonne réponse est saisie
+    const answerInput = document.getElementById("userAnswer");
+    answerInput.addEventListener("input", function() {
+      if (!answerSubmitted && answerInput.value.trim() === currentNumber.toString()) {
+        processMode1Answer();
+      }
+    });
+    
+    // Validation via la touche "Entrée"
+    answerInput.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") {
+        processMode1Answer();
+      }
+    });
+  }
+  
+  // Traitement de la réponse en mode 1
+  function processMode1Answer() {
+    if (answerSubmitted) return; // Empêche une double validation
+    answerSubmitted = true;
+    clearInterval(timerInterval);
+    const answerInput = document.getElementById("userAnswer");
+    let userAnswer = answerInput.value.trim();
+    let elapsed = (new Date().getTime() - startTime) / 1000;
+    let points = 0;
+    let correct = false;
+    if (userAnswer === currentNumber.toString()) {
+      correct = true;
+      points = Math.round((timeLimit - elapsed) * 10);
+      feedbackDiv.textContent = "Correct ! +" + points + " points.";
+      totalScore += points;
+    } else {
+      feedbackDiv.textContent = "Incorrect. La bonne réponse était : " + currentNumber;
+    }
+    totalScoreSpan.textContent = totalScore;
+    disableInput();
+    
+    // Enregistrer le résultat du tour
+    roundResults.push({
+      round: round,
+      number: currentNumber,
+      correct: correct,
+      elapsed: parseFloat(elapsed.toFixed(2)),
+      points: points,
+      answer: userAnswer
+    });
+    
+    nextRoundButton.style.display = "inline-block";
+  }
+  
+  // Bouton "Suivant" pour passer au tour suivant
+  nextRoundButton.addEventListener("click", nextRound);
+  
+  // Fin de partie : affichage du score final, du détail de chaque tour et bouton de partage
+  function gameOver() {
+    clearInterval(timerInterval);
+    gameDiv.style.display = "none";
+    resultDiv.style.display = "block";
+    let html = `<h2>Partie terminée ! Votre score final est : ${totalScore}</h2>`;
+    html += `<h3>Détails des tours :</h3>`;
+    html += `<table>
+               <tr>
+                 <th>Nombre</th>
+                 <th>Réponse</th>
+                 <th>Temps (s)</th>
+               </tr>`;
+    roundResults.forEach(result => {
+      html += `<tr>
+                 <td>${result.number}</td>
+                 <td>${result.correct ? result.elapsed : '-'}</td>
+                 <td>${result.correct ? result.points : 0}</td>
+               </tr>`;
+    });
+    html += `</table>`;
+    html += `<button onclick="restartGame()">Rejouer</button>`;
+    html += `<button onclick="shareScore()" style="margin-left:10px;">Partager mon score</button>`;
+    resultDiv.innerHTML = html;
+  }
+  
+  function restartGame() {
+    menuDiv.style.display = "block";
+    gameDiv.style.display = "none";
+    resultDiv.style.display = "none";
+  }
+  
+  // Fonction pour partager le score
+  function shareScore() {
+    const shareText = `J'ai obtenu ${totalScore} points dans le Jeu de Numéros Français ! Peux-tu faire mieux ? Essaye-le ici : ${window.location.href}`;
+    if (navigator.share) {
+      navigator.share({
+        title: "Jeu de Numéros Français",
+        text: shareText,
+        url: window.location.href
+      })
+      .then(() => console.log('Score partagé avec succès'))
+      .catch((error) => console.log('Erreur de partage', error));
+    } else {
+      copyTextToClipboard(shareText);
+      alert("Votre score a été copié dans le presse-papier !");
+    }
+  }
+  
+  // Fonction utilitaire pour copier du texte dans le presse-papier
+  function copyTextToClipboard(text) {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+    } catch (err) {
+      console.error('Erreur lors de la copie', err);
+    }
+    document.body.removeChild(textArea);
+  }
+  
+  // --- Fonctions d'aide pour la conversion d'un nombre en toutes lettres en français ---
+  function numberToFrench(n) {
+    if (n < 0) return n.toString();
+    if (n < 1000) {
+      return convertHundreds(n);
+    } else if (n < 10000) {
+      let thousands = Math.floor(n / 1000);
+      let remainder = n % 1000;
+      let result = "";
+      if (thousands === 1)
+        result = "mille";
+      else
+        result = convertHundreds(thousands) + " mille";
+      if (remainder > 0)
+        result += " " + convertHundreds(remainder);
+      return result;
+    } else {
+      return n.toString();
+    }
+  }
+  
+  function convertHundreds(n) {
+    const ones = ["zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize"];
+    if (n < 17) return ones[n];
+    if (n < 20) return "dix-" + ones[n - 10];
+    if (n < 70) {
+      let tens = Math.floor(n / 10);
+      let unit = n % 10;
+      const tensWords = ["", "", "vingt", "trente", "quarante", "cinquante", "soixante"];
+      let word = tensWords[tens];
+      if (unit === 1) {
+        word += " et un";
+      } else if (unit > 0) {
+        word += "-" + ones[unit];
+      }
+      return word;
+    }
+    if (n < 80) {
+      if (n === 71) return "soixante et onze";
+      return "soixante-" + convertHundreds(n - 60);
+    }
+    if (n < 100) {
+      let unit = n - 80;
+      let word = "quatre-vingt";
+      if (unit === 0) {
+        word += "s";
+      } else {
+        word += "-" + convertHundreds(unit);
+      }
+      return word;
+    }
+    if (n < 200) {
+      if (n === 100) return "cent";
+      else return "cent " + convertHundreds(n - 100);
+    }
+    if (n < 1000) {
+      let hundreds = Math.floor(n / 100);
+      let remainder = n % 100;
+      let word = convertHundreds(hundreds) + " cent";
+      if (remainder === 0 && hundreds > 1) {
+        word += "s";
+      } else if (remainder > 0) {
+        word += " " + convertHundreds(remainder);
+      }
+      return word;
+    }
+  }
+</script>
+</body>
+</html>
