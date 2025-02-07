@@ -260,7 +260,7 @@
     // Fonction pour lancer la synthèse vocale
     function speakAudio() {
       let text = numberToFrench(num);
-      const API_URL = "http://py313-env.eba-tccdj3if.us-east-1.elasticbeanstalk.com"
+      const API_URL = "https://d2rfyhxyhtuab1.cloudfront.net"
       let audio = new Audio(`${API_URL}/tts?text=${encodeURIComponent(text)}`);
       audio.play().catch(() => {
         // Sinon, utiliser la synthèse vocale native du navigateur
