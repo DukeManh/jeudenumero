@@ -17,14 +17,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+VOICES = [
+    "fr-FR-DeniseNeural",
+    "fr-CA-SylvieNeural",
+    "fr-CA-AntoineNeural",
+    "fr-FR-HenriNeural"
+]
+
 async def stream_audio(text: str):
-    les_voix = [
-        "fr-FR-DeniseNeural",
-        "fr-CA-SylvieNeural",
-        "fr-CA-AntoineNeural",
-        "fr-FR-HenriNeural"
-    ]
-    voix = les_voix[random.randint(0, len(les_voix) - 1)]
+    voix = random.choice(VOICES)
     logger.debug(f"Voix utilisée: {voix}")
     communicate = edge_tts.Communicate(text, voix)
     """audio chunks generator"""
@@ -45,6 +46,10 @@ async def tts(request: Request):
     if not text:
         logger.error("Missing text parameter")
         raise HTTPException(status_code=400, detail="Missing text")
+    
+    if len(text) > 200:
+        logger.error("Text is too long")
+        raise HTTPException(status_code=400, detail="Text is too long")
     try:
         logger.debug(f"Streaming audio for text: {text}")
         return StreamingResponse(
