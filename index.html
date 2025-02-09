@@ -218,11 +218,12 @@
     currentNumber = Math.floor(Math.random() * (maxNumber - minNumber + 1)) + minNumber;
     startTime = new Date().getTime();
     
-    // Démarrer le timer (mise à jour toutes les 100 ms)
-    clearInterval(timerInterval);
-    timerInterval = setInterval(updateTimer, 100);
     
-    mode1Round(currentNumber);
+    startMode1Round(currentNumber).then(() => {
+      // Démarrer le timer (mise à jour toutes les 100 ms)
+      clearInterval(timerInterval);
+      timerInterval = setInterval(updateTimer, 100);
+    });
   }
   
   // Mise à jour du timer et vérification de la limite de temps
@@ -256,13 +257,15 @@
   }
   
   // Mode unique : L'utilisateur écoute le nombre et doit le taper (en chiffres)
-  function mode1Round(num) {
+  function startMode1Round(num) {
     // Fonction pour lancer la synthèse vocale
     function speakAudio() {
       let text = numberToFrench(num);
-      const API_URL = "https://d2rfyhxyhtuab1.cloudfront.net"
+      const API_URL = ["127.0.0.1", "localhost"].indexOf(window.location.hostname) !== -1
+        ? "http://localhost:8000"
+        : "https://d2rfyhxyhtuab1.cloudfront.net"
       let audio = new Audio(`${API_URL}/tts?text=${encodeURIComponent(text)}`);
-      audio.play().catch(() => {
+      return audio.play().catch(() => {
         // Sinon, utiliser la synthèse vocale native du navigateur
         let utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "fr-FR";
@@ -276,10 +279,7 @@
         }
       });
     }
-    
-    // Lecture initiale de l'audio
-    speakAudio();
-    
+
     challengeDiv.textContent = "Écoutez le nombre et tapez-le (en chiffres) :";
     inputAreaDiv.innerHTML = `
       <input type="number" id="userAnswer" autofocus autocomplete="off">
@@ -311,6 +311,9 @@
         processMode1Answer();
       }
     });
+    
+    // Lecture initiale de l'audio
+    return speakAudio();
   }
   
   // Traitement de la réponse en mode 1
