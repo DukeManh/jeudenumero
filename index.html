@@ -263,7 +263,7 @@
       let text = numberToFrench(num);
       const API_URL = ["127.0.0.1", "localhost"].indexOf(window.location.hostname) !== -1
         ? "http://localhost:8000"
-        : "https://d2rfyhxyhtuab1.cloudfront.net"
+        : "https://apt-retina-450420-j4.ue.r.appspot.com/"
       let audio = new Audio(`${API_URL}/tts?text=${encodeURIComponent(text)}`);
       return audio.play().catch(() => {
         // Sinon, utiliser la synthèse vocale native du navigateur

@@ -1,0 +1,20 @@
+2025-02-09 16:26:52,818 - DEBUG - [main] Received request from IP: 127.0.0.1
+2025-02-09 16:26:52,819 - DEBUG - [main] Streaming audio for text: oiseau
+2025-02-09 16:26:52,827 - DEBUG - [main] Voix utilisée: fr-CA-AntoineNeural
+2025-02-09 16:26:52,973 - DEBUG - [main] Received request from IP: 127.0.0.1
+2025-02-09 16:26:52,973 - DEBUG - [main] Streaming audio for text: oiseau
+2025-02-09 16:26:52,974 - DEBUG - [main] Voix utilisée: fr-FR-DeniseNeural
+2025-02-09 16:29:40,296 - DEBUG - [main] Received request from IP: 127.0.0.1
+2025-02-09 16:29:40,296 - DEBUG - [main] Streaming audio for text: oiseau
+2025-02-09 16:29:40,301 - DEBUG - [main] Voix utilisée: fr-FR-DeniseNeural
+2025-02-09 16:29:40,427 - DEBUG - [main] Received request from IP: 127.0.0.1
+2025-02-09 16:29:40,427 - DEBUG - [main] Streaming audio for text: oiseau
+2025-02-09 16:29:40,428 - DEBUG - [main] Voix utilisée: fr-CA-SylvieNeural
+2025-02-09 16:36:31,790 - DEBUG - [asyncio] Using selector: KqueueSelector
+2025-02-09 17:02:56,261 - DEBUG - [asyncio] Using selector: KqueueSelector
+2025-02-09 17:03:10,626 - DEBUG - [main] Received request from IP: 127.0.0.1
+2025-02-09 17:03:10,629 - DEBUG - [main] Streaming audio for text: bonjour
+2025-02-09 17:03:10,634 - DEBUG - [main] Voix utilisée: fr-CA-SylvieNeural
+2025-02-09 17:03:10,762 - DEBUG - [main] Received request from IP: 127.0.0.1
+2025-02-09 17:03:10,766 - DEBUG - [main] Streaming audio for text: bonjour
+2025-02-09 17:03:10,770 - DEBUG - [main] Voix utilisée: fr-FR-DeniseNeural

@@ -11,8 +11,7 @@ logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - [%(name)s] %(message)s',
     handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('app.log')
+        logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
@@ -60,10 +59,3 @@ async def tts(request: Request):
     except Exception as e:
         logger.exception(f"Error processing request: {str(e)}")
         raise
-
-# if __name__ == '__main__':
-#     import os
-#     import uvicorn
-#     port = int(os.environ.get("PORT", 8000))
-#     logger.info(f"Starting server on port {port}")
-#     uvicorn.run(app, host="0.0.0.0", port=port, log_level="debug")
