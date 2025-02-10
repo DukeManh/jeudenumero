@@ -216,11 +216,11 @@
     timeLeftSpan.textContent = timeLimit;
     // Générer un nombre aléatoire dans la gamme choisie
     currentNumber = Math.floor(Math.random() * (maxNumber - minNumber + 1)) + minNumber;
-    startTime = new Date().getTime();
     
     
     startMode1Round(currentNumber).then(() => {
       // Démarrer le timer (mise à jour toutes les 100 ms)
+      startTime = new Date().getTime();
       clearInterval(timerInterval);
       timerInterval = setInterval(updateTimer, 100);
     });
