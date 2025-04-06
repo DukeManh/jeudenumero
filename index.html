@@ -44,7 +44,8 @@
       color: #444;
     }
     input[type="text"],
-    input[type="number"] {
+    input[type="number"],
+    input[type="time"] {
       font-size: 1.2em;
       padding: 10px;
       margin: 5px;
@@ -94,23 +95,68 @@
     tr:nth-child(even) {
       background-color: #f9f9f9;
     }
+    /* Styles pour les onglets */
+    .tabs {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .tab-btn {
+      background-color: #f0f0f0;
+      border: none;
+      padding: 10px 20px;
+      margin: 0 5px;
+      cursor: pointer;
+      border-radius: 5px 5px 0 0;
+      color: #555;
+    }
+    .tab-btn.active {
+      background-color: #ff6f91;
+      color: white;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
   </style>
 </head>
 <body>
 <div class="container">
   <h1>Jeu de Numéros Français</h1>
   
-  <!-- Menu : réglage de la gamme et démarrage du mode unique -->
+  <!-- Menu avec onglets pour les deux modes de jeu -->
   <div id="menu">
-    <div id="rangeSettings">
-      <p>Définissez la gamme des numéros :</p>
-      <label for="minValue">Minimum :</label>
-      <input type="number" id="minValue" value="1" min="1">
-      <label for="maxValue">Maximum :</label>
-      <input type="number" id="maxValue" value="2025" min="1">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="number-game">Nombres</button>
+      <button class="tab-btn" data-tab="time-game">Heures</button>
     </div>
-    <p>Lancer le mode : <strong>Écouter et taper</strong></p>
-    <button id="startButton">Commencer</button>
+    
+    <div id="number-game" class="tab-content active">
+      <div id="rangeSettings">
+        <p>Définissez la gamme des numéros :</p>
+        <label for="minValue">Minimum :</label>
+        <input type="number" id="minValue" value="1" min="1">
+        <label for="maxValue">Maximum :</label>
+        <input type="number" id="maxValue" value="2025" min="1">
+      </div>
+      <p>Lancer le mode : <strong>Écouter et taper</strong></p>
+      <button id="startNumberGame">Commencer</button>
+    </div>
+    
+    <div id="time-game" class="tab-content">
+      <div id="timeSettings">
+        <p>Définissez la plage horaire :</p>
+        <label for="startTime">Heure de début :</label>
+        <input type="time" id="startTime" value="00:00">
+        <label for="endTime">Heure de fin :</label>
+        <input type="time" id="endTime" value="23:59">
+      </div>
+      <p>Lancer le mode : <strong>Écouter l'heure et taper</strong></p>
+      <p><em>Entrez l'heure au format 12h sans AM/PM, par exemple: 2:30</em></p>
+      <button id="startTimeGame">Commencer</button>
+    </div>
   </div>
   
   <!-- Zone du jeu -->
@@ -145,13 +191,16 @@
   let round = 0;
   let totalScore = 0;
   let currentNumber = 0;
+  let currentTime = "";
   let startTime = 0;
   let timerInterval = null;
   const maxRounds = 10;         // 10 tours
   const timeLimit = 15;         // 15 secondes par tour
   let minNumber = 1, maxNumber = 2025;  // Gamme par défaut
+  let timeStart = "00:00", timeEnd = "23:59"; // Plage horaire par défaut
   let answerSubmitted = false;  // Pour éviter plusieurs validations par tour
   let roundResults = [];        // Tableau pour stocker le résultat de chaque tour
+  let gameMode = "number";      // "number" ou "time"
   
   // Éléments de l'interface
   const menuDiv = document.getElementById("menu");
@@ -165,6 +214,22 @@
   const feedbackDiv = document.getElementById("feedback");
   const nextRoundButton = document.getElementById("nextRoundButton");
   
+  // Fonctionnalité des onglets
+  document.querySelectorAll('.tab-btn').forEach(button => {
+    button.addEventListener('click', () => {
+      // Supprimer la classe active de tous les boutons et contenus
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      
+      // Ajouter la classe active au bouton cliqué
+      button.classList.add('active');
+      
+      // Afficher le contenu correspondant
+      const tabId = button.getAttribute('data-tab');
+      document.getElementById(tabId).classList.add('active');
+    });
+  });
+  
   // Mise à jour de la gamme en lisant les valeurs saisies
   function updateRange() {
     const minInput = document.getElementById("minValue");
@@ -177,10 +242,65 @@
     }
   }
   
+  // Mise à jour de la plage horaire
+  function updateTimeRange() {
+    const startTimeInput = document.getElementById("startTime");
+    const endTimeInput = document.getElementById("endTime");
+    
+    // Fix for Firefox - ensure we get valid time values
+    timeStart = startTimeInput.value || startTimeInput.getAttribute('value') || "00:00";
+    timeEnd = endTimeInput.value || endTimeInput.getAttribute('value') || "23:59";
+    
+    // Validate time format (HH:MM)
+    const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (!timeRegex.test(timeStart) || !timeRegex.test(timeEnd)) {
+      console.warn("Invalid time format detected, using defaults");
+      timeStart = "00:00";
+      timeEnd = "23:59";
+    }
+    
+    console.log("Time range set to:", timeStart, "-", timeEnd);
+  }
+  
+  // Check for time input support when page loads
+  document.addEventListener('DOMContentLoaded', function() {
+    // Test if browser properly supports time input
+    const testTimeInput = document.createElement('input');
+    testTimeInput.type = 'time';
+    testTimeInput.value = '00:00';
+    
+    const isTimeInputSupported = testTimeInput.type === 'time' && testTimeInput.value !== '';
+    
+    // Add fallback for browsers with poor time input support
+    if (!isTimeInputSupported) {
+      console.warn("Time input may not be fully supported in this browser");
+      
+      // Set default values directly on the elements
+      document.getElementById("startTime").value = "00:00";
+      document.getElementById("endTime").value = "23:59";
+      
+      // Add helper text for Firefox users
+      const timeSettings = document.getElementById("timeSettings");
+      const helperText = document.createElement('p');
+      helperText.innerHTML = "<small><em>Note: Utilisez le format 24h (HH:MM) si le sélecteur ne fonctionne pas.</em></small>";
+      helperText.style.color = "#666";
+      timeSettings.appendChild(helperText);
+    }
+  });
+
   // Démarrage de la partie
-  document.getElementById("startButton").addEventListener("click", function() {
+  document.getElementById("startNumberGame").addEventListener("click", function() {
+    gameMode = "number";
     updateRange();
-    // Demander le mode plein écran (seulement sur mobile ou petits écrans)
+    if (window.innerWidth < 600) {
+      requestFullScreen();
+    }
+    startGame();
+  });
+  
+  document.getElementById("startTimeGame").addEventListener("click", function() {
+    gameMode = "time";
+    updateTimeRange();
     if (window.innerWidth < 600) {
       requestFullScreen();
     }
@@ -202,6 +322,9 @@
   
   // Lancement du tour suivant
   function nextRound() {
+    // Remove the event listener for Enter key
+    document.removeEventListener("keydown", handleNextRoundKeyPress);
+
     round++;
     answerSubmitted = false;  // Réinitialiser pour ce tour
     if (round > maxRounds) {
@@ -214,45 +337,117 @@
     feedbackDiv.textContent = "";
     nextRoundButton.style.display = "none";
     timeLeftSpan.textContent = timeLimit;
-    // Générer un nombre aléatoire dans la gamme choisie
-    currentNumber = Math.floor(Math.random() * (maxNumber - minNumber + 1)) + minNumber;
     
-    
-    startMode1Round(currentNumber).then(() => {
-      // Démarrer le timer (mise à jour toutes les 100 ms)
-      startTime = new Date().getTime();
-      clearInterval(timerInterval);
-      timerInterval = setInterval(updateTimer, 100);
-    });
-  }
-  
-  // Mise à jour du timer et vérification de la limite de temps
-  function updateTimer() {
-    let elapsed = (new Date().getTime() - startTime) / 1000;
-    let remaining = (timeLimit - elapsed).toFixed(1);
-    timeLeftSpan.textContent = remaining;
-    if (elapsed >= timeLimit) {
-      clearInterval(timerInterval);
-      feedbackDiv.textContent = "Temps écoulé ! La bonne réponse était : " + currentNumber;
-      // Enregistrer le résultat en cas d'échec (temps écoulé)
-      roundResults.push({
-        round: round,
-        number: currentNumber,
-        correct: false,
-        elapsed: timeLimit,
-        points: 0,
-        answer: ""
+    if (gameMode === "number") {
+      // Générer un nombre aléatoire dans la gamme choisie
+      currentNumber = Math.floor(Math.random() * (maxNumber - minNumber + 1)) + minNumber;
+      
+      startMode1Round(currentNumber).then(() => {
+        // Démarrer le timer (mise à jour toutes les 100 ms)
+        startTime = new Date().getTime();
+        clearInterval(timerInterval);
+        timerInterval = setInterval(updateTimer, 100);
       });
-      disableInput();
-      nextRoundButton.style.display = "inline-block";
+    } else if (gameMode === "time") {
+      // Générer une heure aléatoire
+      currentTime = generateRandomTime(timeStart, timeEnd);
+      
+      startTimeRound(currentTime).then(() => {
+        // Démarrer le timer (mise à jour toutes les 100 ms)
+        startTime = new Date().getTime();
+        clearInterval(timerInterval);
+        timerInterval = setInterval(updateTimer, 100);
+      });
     }
   }
   
-  // Désactiver les champs de saisie
-  function disableInput() {
-    let inputs = inputAreaDiv.getElementsByTagName("input");
-    for (let input of inputs) {
-      input.disabled = true;
+  // Générer une heure aléatoire dans la plage
+  function generateRandomTime(start, end) {
+    const startDate = new Date(`2000-01-01T${start}`);
+    const endDate = new Date(`2000-01-01T${end}`);
+    
+    // Si l'heure de fin est antérieure à l'heure de début, supposer que c'est le jour suivant
+    let dateEnd = endDate;
+    if (endDate < startDate) {
+      dateEnd = new Date(endDate);
+      dateEnd.setDate(dateEnd.getDate() + 1);
+    }
+    
+    const randomTime = new Date(startDate.getTime() + Math.random() * (dateEnd.getTime() - startDate.getTime()));
+    
+    // Format HH:MM
+    const hours = String(randomTime.getHours()).padStart(2, '0');
+    const minutes = String(randomTime.getMinutes()).padStart(2, '0');
+    
+    return `${hours}:${minutes}`;
+  }
+  
+  // Conversion de l'heure (HH:MM) en mots français
+  function timeToFrench(timeStr) {
+    const [hours, minutes] = timeStr.split(':').map(num => parseInt(num, 10));
+    
+    // Cas spéciaux : midi et minuit
+    if (minutes === 0) {
+      if (hours === 0 || hours === 24) {
+        return "minuit";
+      } else if (hours === 12) {
+        return "midi";
+      }
+    }
+    
+    // Déterminer l'heure de référence et si on utilise le format "moins"
+    let refHour = hours;
+    let isApproachingNextHour = false;
+    
+    if (minutes > 40 && minutes < 60) {
+      refHour = (hours + 1) % 24;
+      isApproachingNextHour = true;
+    }
+    
+    // Texte pour l'heure de référence
+    let hourText = "";
+    if (refHour === 0 || refHour === 24) {
+      hourText = "minuit";
+    } else if (refHour === 12) {
+      hourText = "midi";
+    } else {
+      hourText = numberToFrench(refHour) + " heure" + (refHour > 1 ? "s" : "");
+    }
+    
+    // Cas où les minutes sont 0
+    if (minutes === 0) {
+      return hourText;
+    }
+    
+    // Expressions naturelles pour les minutes
+    if (!isApproachingNextHour) {
+      if (minutes === 15) {
+        return `${hourText} et quart`;
+      } else if (minutes === 30) {
+        return `${hourText} et demie`;
+      } else if (minutes === 45) {
+        // Pour 45 minutes, on utilise généralement "moins le quart" pour l'heure suivante
+        const nextHour = (hours + 1) % 24;
+        if (nextHour === 0 || nextHour === 24) {
+          return "minuit moins le quart";
+        } else if (nextHour === 12) {
+          return "midi moins le quart";
+        } else {
+          return `${numberToFrench(nextHour)} heure${nextHour > 1 ? "s" : ""} moins le quart`;
+        }
+      } else {
+        return `${hourText} ${numberToFrench(minutes)}`;
+      }
+    } else {
+      // Format "moins" pour les heures approchant l'heure suivante
+      const minutesToNextHour = 60 - minutes;
+      if (minutesToNextHour === 5) {
+        return `${hourText} moins cinq`;
+      } else if (minutesToNextHour === 10) {
+        return `${hourText} moins dix`;
+      } else {
+        return `${hourText} moins ${numberToFrench(minutesToNextHour)}`;
+      }
     }
   }
   
@@ -316,6 +511,132 @@
     return speakAudio();
   }
   
+  // Mode d'écoute et de saisie de l'heure
+  function startTimeRound(timeStr) {
+    function speakTime() {
+      let text = timeToFrench(timeStr);
+      const API_URL = ["127.0.0.1", "localhost"].indexOf(window.location.hostname) !== -1
+        ? "http://localhost:8000"
+        : "https://apt-retina-450420-j4.ue.r.appspot.com/"
+      let audio = new Audio(`${API_URL}/tts?text=${encodeURIComponent(text)}`);
+      return audio.play().catch(() => {
+        // Utiliser la synthèse vocale native du navigateur
+        let utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "fr-FR";
+        if (speechSynthesis.getVoices().length === 0) {
+          speechSynthesis.onvoiceschanged = function() {
+              speechSynthesis.speak(utterance);
+              speechSynthesis.onvoiceschanged = null;
+          };
+        } else {
+          speechSynthesis.speak(utterance);
+        }
+      });
+    }
+
+    challengeDiv.textContent = "Écoutez l'heure et tapez-la (format 12h sans AM/PM, ex: 2:30) :";
+    inputAreaDiv.innerHTML = `
+      <input type="text" id="userAnswer" placeholder="h:mm" autofocus autocomplete="off">
+      <button id="replayAudio">Réécouter</button>
+      <button id="submitAnswer">Valider</button>
+    `;
+    
+    // Bouton pour réécouter l'audio
+    document.getElementById("replayAudio").addEventListener("click", function() {
+      speakTime();
+    });
+    
+    // Bouton pour valider la réponse
+    document.getElementById("submitAnswer").addEventListener("click", function() {
+      processTimeAnswer();
+    });
+    
+    // Validation automatique en temps réel
+    const answerInput = document.getElementById("userAnswer");
+    answerInput.addEventListener("input", function() {
+      // Convertir le format 24h en format 12h pour la comparaison
+      const [hours24, minutes] = currentTime.split(':').map(num => parseInt(num, 10));
+      const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+      const expectedAnswer = `${hours12}:${minutes.toString().padStart(2, '0')}`;
+      
+      // Normaliser la réponse de l'utilisateur
+      let normalizedAnswer = answerInput.value.trim();
+      if (normalizedAnswer.includes(':')) {
+        const [h, m] = normalizedAnswer.split(':');
+        if (m && m.length === 1) {
+          normalizedAnswer = `${h}:0${m}`;
+        }
+      }
+      
+      // Vérifier si la réponse est correcte
+      if (!answerSubmitted && normalizedAnswer === expectedAnswer) {
+        processTimeAnswer();
+      }
+    });
+    
+    // Validation via la touche "Entrée"
+    answerInput.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") {
+        processTimeAnswer();
+      }
+    });
+    
+    // Lecture initiale de l'audio
+    return speakTime();
+  }
+
+  // Traitement de la réponse pour le mode heure
+  function processTimeAnswer() {
+    if (answerSubmitted) return;
+    answerSubmitted = true;
+    clearInterval(timerInterval);
+    const answerInput = document.getElementById("userAnswer");
+    let userAnswer = answerInput.value.trim();
+    let elapsed = (new Date().getTime() - startTime) / 1000;
+    let points = 0;
+    let correct = false;
+    
+    // Convertir le format 24h en format 12h pour la comparaison
+    const [hours24, minutes] = currentTime.split(':').map(num => parseInt(num, 10));
+    const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+    const expectedAnswer = `${hours12}:${minutes.toString().padStart(2, '0')}`;
+    
+    // Normaliser la réponse de l'utilisateur (ajouter des zéros aux minutes si nécessaire)
+    let normalizedAnswer = userAnswer;
+    if (userAnswer.includes(':')) {
+      const [h, m] = userAnswer.split(':');
+      if (m.length === 1) {
+        normalizedAnswer = `${h}:0${m}`;
+      }
+    }
+    
+    if (normalizedAnswer === expectedAnswer) {
+      correct = true;
+      points = Math.round((timeLimit - elapsed) * 10);
+      feedbackDiv.textContent = "Correct ! +" + points + " points.";
+      totalScore += points;
+    } else {
+      feedbackDiv.textContent = `Incorrect. La bonne réponse était : ${expectedAnswer} (${hours24}:${minutes.toString().padStart(2, '0')})`;
+    }
+    totalScoreSpan.textContent = totalScore;
+    disableInput();
+    
+    // Enregistrer le résultat du tour
+    roundResults.push({
+      round: round,
+      challenge: currentTime,
+      correct: correct,
+      elapsed: parseFloat(elapsed.toFixed(2)),
+      points: points,
+      answer: userAnswer,
+      expectedAnswer: expectedAnswer
+    });
+    
+    nextRoundButton.style.display = "inline-block";
+    // Add the event listener for Enter key
+    document.addEventListener("keydown", handleNextRoundKeyPress);
+  }
+  
   // Traitement de la réponse en mode 1
   function processMode1Answer() {
     if (answerSubmitted) return; // Empêche une double validation
@@ -348,10 +669,70 @@
     });
     
     nextRoundButton.style.display = "inline-block";
+    // Add the event listener for Enter key
+    document.addEventListener("keydown", handleNextRoundKeyPress);
+  }
+  
+  // Mise à jour du timer et vérification de la limite de temps
+  function updateTimer() {
+    let elapsed = (new Date().getTime() - startTime) / 1000;
+    let remaining = (timeLimit - elapsed).toFixed(1);
+    timeLeftSpan.textContent = remaining;
+    if (elapsed >= timeLimit) {
+      clearInterval(timerInterval);
+      if (gameMode === "number") {
+        feedbackDiv.textContent = "Temps écoulé ! La bonne réponse était : " + currentNumber;
+        // Enregistrer le résultat en cas d'échec (temps écoulé)
+        roundResults.push({
+          round: round,
+          number: currentNumber,
+          correct: false,
+          elapsed: timeLimit,
+          points: 0,
+          answer: ""
+        });
+      } else if (gameMode === "time") {
+        const [hours24, minutes] = currentTime.split(':').map(num => parseInt(num, 10));
+        const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+        const expectedAnswer = `${hours12}:${minutes.toString().padStart(2, '0')}`;
+        feedbackDiv.textContent = `Temps écoulé ! La bonne réponse était : ${expectedAnswer} (${hours24}:${minutes.toString().padStart(2, '0')})`;
+        roundResults.push({
+          round: round,
+          challenge: currentTime,
+          correct: false,
+          elapsed: timeLimit,
+          points: 0,
+          answer: ""
+        });
+      }
+      disableInput();
+      nextRoundButton.style.display = "inline-block";
+      // Add the event listener for Enter key
+      document.addEventListener("keydown", handleNextRoundKeyPress);
+    }
+  }
+  
+  // Désactiver les champs de saisie
+  function disableInput() {
+    let inputs = inputAreaDiv.getElementsByTagName("input");
+    for (let input of inputs) {
+      input.disabled = true;
+    }
+    let buttons = inputAreaDiv.querySelectorAll("button:not(#nextRoundButton)");
+    for (let button of buttons) {
+      button.disabled = true;
+    }
   }
   
   // Bouton "Suivant" pour passer au tour suivant
   nextRoundButton.addEventListener("click", nextRound);
+
+  // Global handler for pressing Enter to advance to next round
+  function handleNextRoundKeyPress(e) {
+    if (e.key === "Enter" && nextRoundButton.style.display === "inline-block") {
+      nextRound();
+    }
+  }
   
   // Fin de partie : affichage du score final, du détail de chaque tour et bouton de partage
   function gameOver() {
@@ -362,13 +743,14 @@
     html += `<h3>Détails des tours :</h3>`;
     html += `<table>
                <tr>
-                 <th>Nombre</th>
+                 <th>${gameMode === "number" ? "Nombre" : "Heure"}</th>
                  <th>Temps (s)</th>
                  <th>Points</th>
                </tr>`;
     roundResults.forEach(result => {
+      const challenge = gameMode === "number" ? result.number : result.challenge;
       html += `<tr>
-                 <td>${result.number}</td>
+                 <td>${challenge}</td>
                  <td>${result.correct ? result.elapsed : '-'}</td>
                  <td>${result.correct ? result.points : 0}</td>
                </tr>`;
