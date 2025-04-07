@@ -45,7 +45,8 @@
     }
     input[type="text"],
     input[type="number"],
-    input[type="time"] {
+    input[type="time"],
+    input[type="date"] {
       font-size: 1.2em;
       padding: 10px;
       margin: 5px;
@@ -120,17 +121,56 @@
     .tab-content.active {
       display: block;
     }
+    /* Styles pour le jeu de dates */
+    .date-selector {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .date-column {
+      width: 32%;
+    }
+    .options-container {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .date-option {
+      padding: 8px;
+      background-color: #f0f0f0;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      margin-bottom: 5px;
+      color: #333; /* Darker text color */
+      font-weight: 500; /* Make text slightly bolder */
+    }
+    .date-option.selected {
+      background-color: #ff6f91;
+      color: white;
+    }
+    #audio-controls {
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    #listen-counter {
+      font-size: 0.9em;
+      color: #666;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
 <div class="container">
   <h1>Jeu de Numéros Français</h1>
   
-  <!-- Menu avec onglets pour les deux modes de jeu -->
+  <!-- Menu avec onglets pour les modes de jeu -->
   <div id="menu">
     <div class="tabs">
       <button class="tab-btn active" data-tab="number-game">Nombres</button>
       <button class="tab-btn" data-tab="time-game">Heures</button>
+      <button class="tab-btn" data-tab="date-game">Dates</button>
     </div>
     
     <div id="number-game" class="tab-content active">
@@ -156,6 +196,18 @@
       <p>Lancer le mode : <strong>Écouter l'heure et taper</strong></p>
       <p><em>Entrez l'heure au format 12h sans AM/PM, par exemple: 2:30</em></p>
       <button id="startTimeGame">Commencer</button>
+    </div>
+
+    <div id="date-game" class="tab-content">
+      <div id="dateSettings">
+        <p>Définissez la plage de dates :</p>
+        <label for="startDate">Date de début :</label>
+        <input type="date" id="startDate" value="1900-01-01">
+        <label for="endDate">Date de fin :</label>
+        <input type="date" id="endDate" value="2050-12-31">
+      </div>
+      <p>Lancer le mode : <strong>Écouter la date et sélectionner</strong></p>
+      <button id="startDateGame">Commencer</button>
     </div>
   </div>
   
@@ -192,15 +244,17 @@
   let totalScore = 0;
   let currentNumber = 0;
   let currentTime = "";
+  let currentDate = null;
   let startTime = 0;
   let timerInterval = null;
   const maxRounds = 10;         // 10 tours
   const timeLimit = 15;         // 15 secondes par tour
   let minNumber = 1, maxNumber = 2025;  // Gamme par défaut
   let timeStart = "00:00", timeEnd = "23:59"; // Plage horaire par défaut
+  let dateStart = "1900-01-01", dateEnd = "2050-12-31"; // Plage de dates par défaut
   let answerSubmitted = false;  // Pour éviter plusieurs validations par tour
   let roundResults = [];        // Tableau pour stocker le résultat de chaque tour
-  let gameMode = "number";      // "number" ou "time"
+  let gameMode = "number";      // "number", "time" ou "date"
   
   // Éléments de l'interface
   const menuDiv = document.getElementById("menu");
@@ -261,6 +315,25 @@
     
     console.log("Time range set to:", timeStart, "-", timeEnd);
   }
+
+  // Mise à jour de la plage de dates
+  function updateDateRange() {
+    const startDateInput = document.getElementById("startDate");
+    const endDateInput = document.getElementById("endDate");
+    
+    dateStart = startDateInput.value || startDateInput.getAttribute('value') || "1900-01-01";
+    dateEnd = endDateInput.value || endDateInput.getAttribute('value') || "2050-12-31";
+    
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(dateStart) || !dateRegex.test(dateEnd)) {
+      console.warn("Invalid date format detected, using defaults");
+      dateStart = "1900-01-01";
+      dateEnd = "2050-12-31";
+    }
+    
+    console.log("Date range set to:", dateStart, "-", dateEnd);
+  }
   
   // Check for time input support when page loads
   document.addEventListener('DOMContentLoaded', function() {
@@ -301,6 +374,15 @@
   document.getElementById("startTimeGame").addEventListener("click", function() {
     gameMode = "time";
     updateTimeRange();
+    if (window.innerWidth < 600) {
+      requestFullScreen();
+    }
+    startGame();
+  });
+
+  document.getElementById("startDateGame").addEventListener("click", function() {
+    gameMode = "date";
+    updateDateRange();
     if (window.innerWidth < 600) {
       requestFullScreen();
     }
@@ -358,6 +440,17 @@
         clearInterval(timerInterval);
         timerInterval = setInterval(updateTimer, 100);
       });
+    } else if (gameMode === "date") {
+      // Générer une date aléatoire
+      const dateObj = generateRandomDate(dateStart, dateEnd);
+      currentDate = dateObj;
+      
+      startDateRound(currentDate).then(() => {
+        // Démarrer le timer (mise à jour toutes les 100 ms)
+        startTime = new Date().getTime();
+        clearInterval(timerInterval);
+        timerInterval = setInterval(updateTimer, 100);
+      });
     }
   }
   
@@ -380,6 +473,20 @@
     const minutes = String(randomTime.getMinutes()).padStart(2, '0');
     
     return `${hours}:${minutes}`;
+  }
+
+  // Générer une date aléatoire dans la plage
+  function generateRandomDate(start, end) {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    
+    const randomDate = new Date(startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime()));
+    
+    const year = randomDate.getFullYear();
+    const month = randomDate.getMonth(); // 0-11
+    const day = randomDate.getDate();
+    
+    return { year, month, day, date: randomDate };
   }
   
   // Conversion de l'heure (HH:MM) en mots français
@@ -449,6 +556,20 @@
         return `${hourText} moins ${numberToFrench(minutesToNextHour)}`;
       }
     }
+  }
+
+  // Conversion de la date en mots français
+  function dateToFrench(dateObj) {
+    const months = [
+      "janvier", "février", "mars", "avril", "mai", "juin",
+      "juillet", "août", "septembre", "octobre", "novembre", "décembre"
+    ];
+    
+    const day = dateObj.day;
+    const month = months[dateObj.month];
+    const year = dateObj.year;
+    
+    return `le ${numberToFrench(day)} ${month} ${numberToFrench(year)}`;
   }
   
   // Mode unique : L'utilisateur écoute le nombre et doit le taper (en chiffres)
@@ -585,6 +706,213 @@
     return speakTime();
   }
 
+  // Mode d'écoute et de sélection de la date
+  function startDateRound(dateObj) {
+    let audioPlayCount = 0;
+    const maxAudioPlays = 2;
+    
+    function speakDate() {
+      if (audioPlayCount >= maxAudioPlays) {
+        document.getElementById('listen-button').disabled = true;
+        return Promise.resolve();
+      }
+      
+      audioPlayCount++;
+      
+      // Update button text with play count
+      const listenButton = document.getElementById('listen-button');
+      if (audioPlayCount === maxAudioPlays) {
+        listenButton.textContent = "Écouter (0 restant)";
+        listenButton.disabled = true;
+      } else {
+        listenButton.textContent = `Écouter (${maxAudioPlays - audioPlayCount} restant)`;
+      }
+      
+      let text = dateToFrench(dateObj);
+      const API_URL = ["127.0.0.1", "localhost"].indexOf(window.location.hostname) !== -1
+        ? "http://localhost:8000"
+        : "https://apt-retina-450420-j4.ue.r.appspot.com/"
+      let audio = new Audio(`${API_URL}/tts?text=${encodeURIComponent(text)}`);
+      return audio.play().catch(() => {
+        // Utiliser la synthèse vocale native du navigateur
+        let utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "fr-FR";
+        if (speechSynthesis.getVoices().length === 0) {
+          speechSynthesis.onvoiceschanged = function() {
+              speechSynthesis.speak(utterance);
+              speechSynthesis.onvoiceschanged = null;
+          };
+        } else {
+          speechSynthesis.speak(utterance);
+        }
+      });
+    }
+
+    challengeDiv.textContent = "Écoutez la date :";
+    
+    // First, just show the listen button
+    inputAreaDiv.innerHTML = `
+      <div id="audio-controls">
+        <button id="listen-button">Écouter (${maxAudioPlays} restants)</button>
+        <button id="show-options-button" style="display:none;">Afficher les options</button>
+      </div>
+    `;
+    
+    // Add event listener for the listen button
+    document.getElementById("listen-button").addEventListener("click", function() {
+      speakDate().then(() => {
+        document.getElementById("show-options-button").style.display = "inline-block";
+      });
+    });
+    
+    // Add event listener for the show options button
+    document.getElementById("show-options-button").addEventListener("click", function() {
+      // Generate options for day, month, and year - reduced to 4 options each
+      const dayOptions = generateDateOptions(dateObj, 'day', 4);
+      const monthOptions = generateDateOptions(dateObj, 'month', 4);
+      const yearOptions = generateDateOptions(dateObj, 'year', 4);
+      
+      // Update challenge text
+      challengeDiv.textContent = "Sélectionnez les bonnes options pour la date que vous avez entendue :";
+      
+      // Replace the audio controls with the multiple choice interface
+      inputAreaDiv.innerHTML = `
+        <div class="date-selector">
+          <div class="date-column">
+            <h3>Jour</h3>
+            <div class="options-container day-options">
+              ${generateOptionButtons(dayOptions, 'day')}
+            </div>
+          </div>
+          <div class="date-column">
+            <h3>Mois</h3>
+            <div class="options-container month-options">
+              ${generateOptionButtons(monthOptions, 'month')}
+            </div>
+          </div>
+          <div class="date-column">
+            <h3>Année</h3>
+            <div class="options-container year-options">
+              ${generateOptionButtons(yearOptions, 'year')}
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Event listeners for the option buttons
+      document.querySelectorAll('.date-option').forEach(button => {
+        button.addEventListener('click', function() {
+          // Remove selected class from other options in the same category
+          const category = this.getAttribute('data-category');
+          document.querySelectorAll(`.date-option[data-category="${category}"]`).forEach(btn => {
+            btn.classList.remove('selected');
+          });
+          
+          // Add selected class to the clicked button
+          this.classList.add('selected');
+          
+          // Check if all categories have been selected
+          const daySelected = document.querySelector('.date-option[data-category="day"].selected');
+          const monthSelected = document.querySelector('.date-option[data-category="month"].selected');
+          const yearSelected = document.querySelector('.date-option[data-category="year"].selected');
+          
+          // If all three components are selected, automatically validate
+          if (daySelected && monthSelected && yearSelected) {
+            // Give a slight delay to show the selection before processing
+            setTimeout(() => {
+              processDateAnswer(dateObj);
+            }, 300);
+          }
+        });
+      });
+      
+      // Start the timer only when options are shown
+      startTime = new Date().getTime();
+      clearInterval(timerInterval);
+      timerInterval = setInterval(updateTimer, 100);
+    });
+    
+    return Promise.resolve(); // We don't auto-play the audio anymore
+  }
+  
+  // Function to generate HTML for option buttons
+  function generateOptionButtons(options, category) {
+    return options.map(option => {
+      const displayValue = category === 'month' 
+        ? getMonthName(option.value - 1) // Convert 1-based to 0-based for month names
+        : option.value.toString();
+      
+      return `
+        <button class="date-option" data-category="${category}" data-value="${option.value}" data-correct="${option.correct}">
+          ${displayValue}
+        </button>
+      `;
+    }).join('');
+  }
+  
+  // Get the French month name
+  function getMonthName(monthIndex) {
+    const months = [
+      "janvier", "février", "mars", "avril", "mai", "juin",
+      "juillet", "août", "septembre", "octobre", "novembre", "décembre"
+    ];
+    return months[monthIndex];
+  }
+
+  // Traitement de la réponse pour le mode date
+  function processDateAnswer(dateObj) {
+    if (answerSubmitted) return;
+    answerSubmitted = true;
+    clearInterval(timerInterval);
+    let elapsed = (new Date().getTime() - startTime) / 1000;
+    let points = 0;
+    let correct = false;
+    
+    // Get user's selected values
+    const selectedDay = document.querySelector('.date-option[data-category="day"].selected')?.getAttribute('data-value');
+    const selectedMonth = document.querySelector('.date-option[data-category="month"].selected')?.getAttribute('data-value');
+    const selectedYear = document.querySelector('.date-option[data-category="year"].selected')?.getAttribute('data-value');
+    
+    // Convert to integers for comparison
+    const dayValue = selectedDay ? parseInt(selectedDay) : null;
+    const monthValue = selectedMonth ? parseInt(selectedMonth) : null;
+    const yearValue = selectedYear ? parseInt(selectedYear) : null;
+    
+    // Check if all selections are correct
+    if (dayValue === dateObj.day && 
+        monthValue === dateObj.month + 1 && 
+        yearValue === dateObj.year) {
+      correct = true;
+      points = Math.round((timeLimit - elapsed) * 10);
+      feedbackDiv.textContent = "Correct ! +" + points + " points.";
+      totalScore += points;
+    } else {
+      const months = [
+        "janvier", "février", "mars", "avril", "mai", "juin",
+        "juillet", "août", "septembre", "octobre", "novembre", "décembre"
+      ];
+      feedbackDiv.textContent = `Incorrect. La bonne réponse était : ${dateObj.day} ${months[dateObj.month]} ${dateObj.year}`;
+    }
+    
+    totalScoreSpan.textContent = totalScore;
+    disableInput();
+    
+    // Enregistrer le résultat du tour
+    roundResults.push({
+      round: round,
+      challenge: `${dateObj.day}/${dateObj.month + 1}/${dateObj.year}`,
+      correct: correct,
+      elapsed: parseFloat(elapsed.toFixed(2)),
+      points: points,
+      answer: selectedDay && selectedMonth && selectedYear ? 
+              `${dayValue}/${monthValue}/${yearValue}` : "Incomplet"
+    });
+    
+    nextRoundButton.style.display = "inline-block";
+    // Add the event listener for Enter key
+    document.addEventListener("keydown", handleNextRoundKeyPress);
+  }
+  
   // Traitement de la réponse pour le mode heure
   function processTimeAnswer() {
     if (answerSubmitted) return;
@@ -704,6 +1032,20 @@
           points: 0,
           answer: ""
         });
+      } else if (gameMode === "date") {
+        const months = [
+          "janvier", "février", "mars", "avril", "mai", "juin",
+          "juillet", "août", "septembre", "octobre", "novembre", "décembre"
+        ];
+        feedbackDiv.textContent = `Temps écoulé ! La bonne réponse était : ${currentDate.day} ${months[currentDate.month]} ${currentDate.year}`;
+        roundResults.push({
+          round: round,
+          challenge: `${currentDate.day}/${currentDate.month + 1}/${currentDate.year}`,
+          correct: false,
+          elapsed: timeLimit,
+          points: 0,
+          answer: ""
+        });
       }
       disableInput();
       nextRoundButton.style.display = "inline-block";
@@ -743,7 +1085,7 @@
     html += `<h3>Détails des tours :</h3>`;
     html += `<table>
                <tr>
-                 <th>${gameMode === "number" ? "Nombre" : "Heure"}</th>
+                 <th>${gameMode === "number" ? "Nombre" : (gameMode === "time" ? "Heure" : "Date")}</th>
                  <th>Temps (s)</th>
                  <th>Points</th>
                </tr>`;
@@ -868,6 +1210,49 @@
       }
       return word;
     }
+  }
+
+  // Generate date component options (including the correct one and some distractors)
+  function generateDateOptions(dateObj, component, count) {
+    const options = [];
+    let correctValue;
+    
+    // Get the correct value
+    if (component === 'day') {
+      correctValue = dateObj.day;
+    } else if (component === 'month') {
+      correctValue = dateObj.month + 1; // Adjust for 0-based month
+    } else { // year
+      correctValue = dateObj.year;
+    }
+    
+    // Add the correct option
+    options.push({ value: correctValue, correct: true });
+    
+    // Generate distractor options
+    const range = component === 'year' ? 100 : (component === 'month' ? 12 : 31);
+    const min = component === 'year' ? 1900 : (component === 'month' ? 1 : 1);
+    const max = component === 'year' ? 2050 : (component === 'month' ? 12 : 31);
+    
+    while (options.length < count) {
+      let randomValue;
+      if (component === 'year') {
+        // For years, generate values close to the correct year
+        randomValue = correctValue + Math.floor(Math.random() * 20) - 10;
+        if (randomValue < min) randomValue = min;
+        if (randomValue > max) randomValue = max;
+      } else {
+        randomValue = Math.floor(Math.random() * range) + min;
+      }
+      
+      // Make sure we don't add duplicates
+      if (!options.some(option => option.value === randomValue)) {
+        options.push({ value: randomValue, correct: false });
+      }
+    }
+    
+    // Shuffle the options
+    return options.sort(() => Math.random() - 0.5);
   }
 </script>
 </body>
