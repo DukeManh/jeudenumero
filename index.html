@@ -281,6 +281,10 @@
       // Afficher le contenu correspondant
       const tabId = button.getAttribute('data-tab');
       document.getElementById(tabId).classList.add('active');
+      
+      // Mise à jour du mode de jeu et de l'URL basée sur l'onglet sélectionné
+      const mode = tabId.replace('-game', '');
+      updateUrlForMode(mode);
     });
   });
   
@@ -1111,12 +1115,14 @@
   
   // Fonction pour partager le score
   function shareScore() {
-    const shareText = `J'ai obtenu ${totalScore} points dans le Jeu de Numéros Français ! Peux-tu faire mieux ? Essaye-le ici : ${window.location.href}`;
+    const shareableUrl = createShareableUrl();
+    const shareText = `J'ai obtenu ${totalScore} points dans le Jeu de Numéros Français (mode ${gameMode})! Peux-tu faire mieux ? Essaye-le ici : ${shareableUrl}`;
+    
     if (navigator.share) {
       navigator.share({
         title: "Jeu de Numéros Français",
         text: shareText,
-        url: window.location.href
+        url: shareableUrl
       })
       .then(() => console.log('Score partagé avec succès'))
       .catch((error) => console.log('Erreur de partage', error));
@@ -1254,6 +1260,102 @@
     // Shuffle the options
     return options.sort(() => Math.random() - 0.5);
   }
+
+  // Fonction pour analyser les paramètres de l'URL
+  function getQueryParams() {
+    const params = {};
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    
+    for (const [key, value] of urlParams.entries()) {
+      params[key] = value;
+    }
+    
+    return params;
+  }
+
+  // Fonction pour gérer les paramètres d'URL au chargement de la page
+  function handleUrlParams() {
+    const params = getQueryParams();
+    
+    // Vérifier le mode de jeu
+    if (params.mode) {
+      // Sélectionner l'onglet approprié
+      const validModes = ['number', 'time', 'date'];
+      const mode = params.mode.toLowerCase();
+      
+      if (validModes.includes(mode)) {
+        // Trouver et cliquer sur le bouton d'onglet correspondant
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+          if (btn.getAttribute('data-tab') === `${mode}-game`) {
+            btn.click();
+          }
+        });
+        
+        // Définir les paramètres spécifiques au mode
+        if (mode === 'number') {
+          if (params.min) document.getElementById('minValue').value = params.min;
+          if (params.max) document.getElementById('maxValue').value = params.max;
+        } else if (mode === 'time') {
+          if (params.timeStart) document.getElementById('startTime').value = params.timeStart;
+          if (params.timeEnd) document.getElementById('endTime').value = params.timeEnd;
+        } else if (mode === 'date') {
+          if (params.dateStart) document.getElementById('startDate').value = params.dateStart;
+          if (params.dateEnd) document.getElementById('endDate').value = params.dateEnd;
+        }
+        
+        // Démarrer automatiquement si demandé
+        if (params.autostart === 'true') {
+          setTimeout(() => {
+            const startButton = document.getElementById(`start${mode.charAt(0).toUpperCase() + mode.slice(1)}Game`);
+            if (startButton) startButton.click();
+          }, 500); // Petit délai pour s'assurer que l'interface est prête
+        }
+      }
+    } else {
+      // Si aucun mode n'est spécifié, définir le mode par défaut à 'number' dans l'URL
+      updateUrlForMode('number');
+    }
+  }
+
+  // Fonction pour créer une URL partageable avec les paramètres actuels
+  function createShareableUrl() {
+    const baseUrl = window.location.href.split('?')[0];
+    let params = new URLSearchParams();
+    
+    params.append('mode', gameMode);
+    
+    if (gameMode === 'number') {
+      params.append('min', minNumber);
+      params.append('max', maxNumber);
+    } else if (gameMode === 'time') {
+      params.append('timeStart', timeStart);
+      params.append('timeEnd', timeEnd);
+    } else if (gameMode === 'date') {
+      params.append('dateStart', dateStart);
+      params.append('dateEnd', dateEnd);
+    }
+    
+    return `${baseUrl}?${params.toString()}`;
+  }
+  
+  // Fonction pour mettre à jour l'URL avec le mode sélectionné
+  function updateUrlForMode(mode) {
+    // Obtenir les paramètres actuels
+    const currentParams = new URLSearchParams(window.location.search);
+    
+    // Mettre à jour le paramètre de mode
+    currentParams.set('mode', mode);
+    
+    // Construire la nouvelle URL
+    const newUrl = window.location.pathname + '?' + currentParams.toString();
+    
+    // Mettre à jour l'URL sans recharger la page
+    window.history.replaceState({}, '', newUrl);
+  }
+  
+  // Appeler la fonction lorsque la page est chargée
+  window.addEventListener('DOMContentLoaded', handleUrlParams);
 </script>
 </body>
 </html>
